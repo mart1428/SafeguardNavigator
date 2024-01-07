@@ -1,11 +1,17 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
 
-from model import createLinearRegression, createAndSaveScaler
 from pickle import dump
 
+from model import createLinearRegression, createAndSaveScaler, loadScaler, createDecisionTree, loadModel, createRandomForest, createXGBregressor
+
 def clean_csv_data(filename):
+   '''
+   (str) -> None
+   Save cleaned file to csv. 
+   '''
    df = pd.read_csv(filename)
 
    drop_cols = ['X', 'Y', 'OBJECTID', 'REPORT_DATE', \
@@ -22,6 +28,10 @@ def clean_csv_data(filename):
    df.to_csv('data_clean.csv', index = False)
 
 def prepare_data(df):
+   '''
+   (pandas.DataFrame) -> (pandas.DataFrame)
+   Return prepared data that is ready to be processed. 
+   '''
    unique_lat_long = get_lat_long_combo(df[['LAT_WGS84', 'LONG_WGS84']])
    df['date'] = pd.to_datetime(df['OCC_DATE'].astype(str) + ' ' + df['OCC_HOUR'].astype(str) + ':00')
    dateRange = pd.date_range(df.date.min(), df.date.max(), freq = 'H').to_frame(False, 'date')
@@ -54,13 +64,28 @@ def prepare_data(df):
 def get_lat_long_combo(df):
    '''
    (pandas.DataFrame) -> set(tuple(float, float))
-   return a set of unique Latitude and Longitude from DataFrame
+   Return a set of unique Latitude and Longitude from DataFrame
    '''
    lat_long_set = set()
    for row in df.itertuples():
       lat_long_set.add((row[1], row[2]))
    return lat_long_set
 
+def get_all_models_prediction(models, X):
+   '''
+   (List(str)), (pandas.DataFrame)
+   '''
+
+   modified_df = X.copy()
+
+   for m in models:
+      model = loadModel(m)
+
+      y_pred = pd.Series(model.predict(X), index = X.index)
+
+      modified_df[m] = y_pred
+   
+   return modified_df
 
 if __name__ == '__main__':
    # clean_csv_data('Major_Crime_Indicators_Open_Data.csv')
@@ -73,5 +98,35 @@ if __name__ == '__main__':
    data = pd.read_csv('processed_data.csv', index_col= 'date', parse_dates= True)
    data = data.to_period('H')
 
-   data = createAndSaveScaler(data)
-   createLinearRegression(data)
+   # data = createAndSaveScaler(data)
+   lat_scaler, long_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl')
+   data['LAT_WGS84'] = lat_scaler.transform(data[['LAT_WGS84']])
+   data['LONG_WGS84'] = long_scaler.transform(data[['LONG_WGS84']])
+
+   data_train = data[data.index <= '2023-06-30']
+   data_test = data[data.index > '2023-06-30']
+
+   # cluster = KMeans().fit(data_train.drop('crime_count', axis = 1))
+   # dump(cluster, open('cluster.pkl', 'wb'))
+   cluster = loadModel('cluster.pkl')
+
+   data_train['cluster'] = cluster.predict(data_train.drop('crime_count', axis = 1))
+   data_test['cluster'] = cluster.predict(data_test.drop('crime_count', axis = 1))
+
+
+   X_train, y_train, X_test, y_test = data_train.drop('crime_count', axis = 1), data_train['crime_count'], data_test.drop('crime_count', axis = 1), data_test['crime_count']
+
+   models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl']
+   # print('LinReg')
+   # createLinearRegression(X_train, y_train, X_test, y_test)
+
+   # print('CART')
+   # createDecisionTree(X_train, y_train, X_test, y_test)
+
+   # print('RandomForest')
+   # createRandomForest(X_train, y_train, X_test, y_test)
+   
+   # print('XGB')
+   # createXGBregressor(X_train, y_train, X_test, y_test)
+
+   print(get_all_models_prediction(models, X_train))
