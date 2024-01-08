@@ -1,11 +1,11 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.cluster import KMeans
 
 from pickle import dump
 
-from model import createLinearRegression, createAndSaveScaler, loadScaler, createDecisionTree, loadModel, createRandomForest, createXGBregressor
+from model import createLinearRegression, createAndSaveScaler, loadScaler, createDecisionTree, loadModel, createRandomForest, createXGBregressor, createLogisticRegression
 
 def clean_csv_data(filename):
    '''
@@ -73,7 +73,7 @@ def get_lat_long_combo(df):
 
 def get_all_models_prediction(models, X):
    '''
-   (List(str)), (pandas.DataFrame)
+   (List(str)), (pandas.DataFrame) -> (pandas.DataFrame)
    '''
 
    modified_df = X.copy()
@@ -95,15 +95,16 @@ if __name__ == '__main__':
    # df = prepare_data(df)
    # df.to_csv('processed_data.csv')
 
-   data = pd.read_csv('processed_data.csv', index_col= 'date', parse_dates= True)
+   data = pd.read_csv('processed_data.csv', index_col= 'date', parse_dates= True)         #lat long example: 43.6384649321311  -79.4378661170172
    data = data.to_period('H')
+   # data = data[(data.LAT_WGS84 == 43.6384649321311) & (data.LONG_WGS84 == -79.4378661170172)]
 
    # data = createAndSaveScaler(data)
    lat_scaler, long_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl')
    data['LAT_WGS84'] = lat_scaler.transform(data[['LAT_WGS84']])
    data['LONG_WGS84'] = long_scaler.transform(data[['LONG_WGS84']])
 
-   data_train = data[data.index <= '2023-06-30']
+   data_train = data[data.index <= '2023-06-30']              
    data_test = data[data.index > '2023-06-30']
 
    # cluster = KMeans().fit(data_train.drop('crime_count', axis = 1))
@@ -129,4 +130,21 @@ if __name__ == '__main__':
    # print('XGB')
    # createXGBregressor(X_train, y_train, X_test, y_test)
 
-   print(get_all_models_prediction(models, X_train))
+   modified_df_train = get_all_models_prediction(models, X_train)
+   modified_df_test = get_all_models_prediction(models, X_test)
+
+   X_train_modified, X_test_modified = modified_df_train, modified_df_test
+
+   crime_scaler = MinMaxScaler((0,1)).fit(y_train.to_frame())
+   y_train_scaled = pd.Series(crime_scaler.transform(y_train.to_frame())[:,0], index = y_train.index)
+   y_test_scaled = pd.Series(crime_scaler.transform(y_test.to_frame())[:,0], index = y_test.index)
+
+   # bins = [0, 0.1, 1]
+   # labels = ['Low', 'Moderate', 'High']
+   # labels = [0, 1]      #Low Caution, High Caution
+   y_train_scaled = y_train_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
+   y_test_scaled = y_test_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
+
+   createLogisticRegression(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled )
+
+   
