@@ -4,8 +4,10 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.cluster import KMeans
 
 from pickle import dump
+import sys
 
-from model import createLinearRegression, createAndSaveScaler, loadScaler, createDecisionTree, loadModel, createRandomForest, createXGBregressor, createLogisticRegression
+from model import createLinearRegression, createAndSaveScaler, loadScaler, createDecisionTree, loadModel, createRandomForest, createXGBregressor, createLogisticRegression,\
+createDeterministicProcessIndex
 
 def clean_csv_data(filename):
    '''
@@ -88,27 +90,30 @@ def get_all_models_prediction(models, X):
    return modified_df
 
 if __name__ == '__main__':
+   #------------------IF Running for the first time-----------------------
    # clean_csv_data('Major_Crime_Indicators_Open_Data.csv')
    # df = pd.read_csv('data_clean.csv')
    # df = df[df.OCC_DATE >= '2022-01-01']
 
    # df = prepare_data(df)
    # df.to_csv('processed_data.csv')
+   #====================================================================
 
    data = pd.read_csv('processed_data.csv', index_col= 'date', parse_dates= True)         #lat long example: 43.6384649321311  -79.4378661170172
    data = data.to_period('H')
-   # data = data[(data.LAT_WGS84 == 43.6384649321311) & (data.LONG_WGS84 == -79.4378661170172)]
 
-   # data = createAndSaveScaler(data)
-   lat_scaler, long_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl')
+   # data = data[(data.LAT_WGS84 == 43.6384649321311) & (data.LONG_WGS84 == -79.4378661170172)]
+   data = createAndSaveScaler(data)
+   lat_scaler, long_scaler, crime_count_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl', 'pkl_models/crime_count_scaler.pkl')
    data['LAT_WGS84'] = lat_scaler.transform(data[['LAT_WGS84']])
    data['LONG_WGS84'] = long_scaler.transform(data[['LONG_WGS84']])
+   data['crime_count'] = crime_count_scaler.transform(data[['crime_count']])
 
    data_train = data[data.index <= '2023-06-30']              
    data_test = data[data.index > '2023-06-30']
 
-   # cluster = KMeans().fit(data_train.drop('crime_count', axis = 1))
-   # dump(cluster, open('cluster.pkl', 'wb'))
+   cluster = KMeans().fit(data_train.drop('crime_count', axis = 1))
+   dump(cluster, open('cluster.pkl', 'wb'))
    cluster = loadModel('cluster.pkl')
 
    data_train['cluster'] = cluster.predict(data_train.drop('crime_count', axis = 1))
@@ -118,17 +123,17 @@ if __name__ == '__main__':
    X_train, y_train, X_test, y_test = data_train.drop('crime_count', axis = 1), data_train['crime_count'], data_test.drop('crime_count', axis = 1), data_test['crime_count']
 
    models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl']
-   # print('LinReg')
-   # createLinearRegression(X_train, y_train, X_test, y_test)
+   print('LinReg')
+   createLinearRegression(X_train, y_train, X_test, y_test)
 
-   # print('CART')
-   # createDecisionTree(X_train, y_train, X_test, y_test)
+   print('CART')
+   createDecisionTree(X_train, y_train, X_test, y_test)
 
-   # print('RandomForest')
-   # createRandomForest(X_train, y_train, X_test, y_test)
+   print('RandomForest')
+   createRandomForest(X_train, y_train, X_test, y_test)
    
-   # print('XGB')
-   # createXGBregressor(X_train, y_train, X_test, y_test)
+   print('XGB')
+   createXGBregressor(X_train, y_train, X_test, y_test)
 
    modified_df_train = get_all_models_prediction(models, X_train)
    modified_df_test = get_all_models_prediction(models, X_test)
