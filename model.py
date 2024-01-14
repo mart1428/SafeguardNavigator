@@ -1,9 +1,10 @@
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, accuracy_score, recall_score, precision_score
 from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVC
 
 from statsmodels.tsa.deterministic import DeterministicProcess, CalendarFourier
 
@@ -34,7 +35,7 @@ def createDeterministicProcessIndex(data, fourier_freq = 'H', fourier_order = 2)
     return modified_data
 
 def createLinearRegression(X_train, y_train, X_test, y_test):
-    model = LinearRegression().fit(X_train, y_train)
+    model = LinearRegression(random_state= 0).fit(X_train, y_train)
 
     y_fit = pd.Series(model.predict(X_train), index = X_train.index)
     y_pred = pd.Series(model.predict(X_test), index = X_test.index)
@@ -48,8 +49,8 @@ def createLinearRegression(X_train, y_train, X_test, y_test):
     dump(model, open('pkl_models/LinearRegression.pkl', 'wb'))
 
 
-def createDecisionTree(X_train, y_train, X_test, y_test):
-    model = DecisionTreeRegressor().fit(X_train, y_train)
+def createDecisionTreeRegressor(X_train, y_train, X_test, y_test):
+    model = DecisionTreeRegressor(random_state= 0).fit(X_train, y_train)
 
     y_fit = pd.Series(model.predict(X_train), index = X_train.index)
     y_pred = pd.Series(model.predict(X_test), index = X_test.index)
@@ -63,7 +64,7 @@ def createDecisionTree(X_train, y_train, X_test, y_test):
     dump(model, open('pkl_models/DecisionTree.pkl', 'wb'))
 
 def createRandomForest(X_train, y_train, X_test, y_test):
-    model = RandomForestRegressor().fit(X_train, y_train)
+    model = RandomForestRegressor(random_state= 0).fit(X_train, y_train)
 
     y_fit = pd.Series(model.predict(X_train), index = X_train.index)
     y_pred = pd.Series(model.predict(X_test), index = X_test.index)
@@ -77,7 +78,7 @@ def createRandomForest(X_train, y_train, X_test, y_test):
     dump(model, open('pkl_models/RandomForest.pkl', 'wb'))
 
 def createXGBregressor(X_train, y_train, X_test, y_test):
-    model = XGBRegressor().fit(X_train, y_train)
+    model = XGBRegressor(random_state= 0).fit(X_train, y_train)
 
     y_fit = pd.Series(model.predict(X_train), index = X_train.index)
     y_pred = pd.Series(model.predict(X_test), index = X_test.index)
@@ -91,7 +92,7 @@ def createXGBregressor(X_train, y_train, X_test, y_test):
     dump(model, open('pkl_models/XGBRegressor.pkl', 'wb'))
 
 def createLogisticRegression(X_train, y_train, X_test, y_test):
-    model = LogisticRegression(class_weight= 'balanced').fit(X_train, y_train)
+    model = LogisticRegression(class_weight= 'balanced', random_state= 0).fit(X_train, y_train)
 
     y_fit = pd.Series(model.predict(X_train), index = X_train.index)
     y_pred = pd.Series(model.predict(X_test), index = X_test.index)
@@ -111,6 +112,47 @@ def createLogisticRegression(X_train, y_train, X_test, y_test):
 
     dump(model, open('pkl_models/LogisticRegression.pkl', 'wb'))
 
+def createDecisionTreeClassifier(X_train, y_train, X_test, y_test):
+    model = DecisionTreeClassifier(class_weight= 'balanced',random_state= 0).fit(X_train, y_train)
+
+    y_fit = pd.Series(model.predict(X_train), index = X_train.index)
+    y_pred = pd.Series(model.predict(X_test), index = X_test.index)
+
+    train_acc = accuracy_score(y_train, y_fit)
+    test_acc = accuracy_score(y_test, y_pred)
+    test_recall = recall_score(y_test, y_pred)
+    test_precision = precision_score(y_test, y_pred)
+
+    y_pred_proba = pd.Series(model.predict_proba(X_test)[:,1], index = X_test.index)
+
+    print("Train score:", train_acc)
+    print("Test score:", test_acc)
+    print("Recall Test score:", test_recall)
+    print("Precision Test score:", test_precision)
+    print(y_pred_proba)
+
+    dump(model, open('pkl_models/SVM.pkl', 'wb'))
+
+def createSVM(X_train, y_train, X_test, y_test):
+    model = SVC(kernel = 'rbf', class_weight = 'balanced',random_state= 0).fit(X_train, y_train)
+
+    y_fit = pd.Series(model.predict(X_train), index = X_train.index)
+    y_pred = pd.Series(model.predict(X_test), index = X_test.index)
+
+    train_acc = accuracy_score(y_train, y_fit)
+    test_acc = accuracy_score(y_test, y_pred)
+    test_recall = recall_score(y_test, y_pred)
+    test_precision = precision_score(y_test, y_pred)
+
+    y_pred_proba = pd.Series(model.predict_proba(X_test)[:,1], index = X_test.index)
+
+    print("Train score:", train_acc)
+    print("Test score:", test_acc)
+    print("Recall Test score:", test_recall)
+    print("Precision Test score:", test_precision)
+    print(y_pred_proba)
+
+    dump(model, open('pkl_models/SVM.pkl', 'wb'))
 
 def createAndSaveScaler(data):
     lat_scaler = StandardScaler().fit(data[['LAT_WGS84']])
