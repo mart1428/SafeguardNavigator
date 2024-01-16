@@ -6,8 +6,8 @@ from sklearn.cluster import KMeans
 from pickle import dump
 import sys
 
-from model import createLinearRegression, createAndSaveScaler, loadScaler, loadModel, createRandomForest, createXGBregressor, createLogisticRegression,\
-createDeterministicProcessIndex, createSVM, createDecisionTreeClassifier, createDecisionTreeRegressor
+from model import createLinearRegression, createAndSaveScaler, loadScaler, loadModel, createRandomForestRegressor, createXGBregressor, createLogisticRegression,\
+createDeterministicProcessIndex, createSVC, createDecisionTreeClassifier, createDecisionTreeRegressor, createRandomForestClassifier
 
 def clean_csv_data(filename):
    '''
@@ -89,7 +89,7 @@ def get_all_models_prediction(models, X):
    
    return modified_df
 
-def test(data, models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl']):
+def run(data, models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl']):
    lat_scaler, long_scaler, crime_count_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl', 'pkl_models/crime_count_scaler.pkl')
    data['LAT_WGS84'] = lat_scaler.transform(data[['LAT_WGS84']])
    data['LONG_WGS84'] = long_scaler.transform(data[['LONG_WGS84']])
@@ -131,9 +131,9 @@ if __name__ == '__main__':
    data_train = data[data.index <= '2023-06-30']              
    data_test = data[data.index > '2023-06-30']
 
-   # cluster = KMeans().fit(data_train.drop('crime_count', axis = 1))
-   # dump(cluster, open('pkl_models/cluster.pkl', 'wb'))
-   cluster = loadModel('pkl_models/cluster.pkl')
+   cluster = KMeans().fit(data_train.drop('crime_count', axis = 1))
+   dump(cluster, open('pkl_models/cluster.pkl', 'wb'))
+   cluster = loadModel('cluster.pkl')
 
    data_train['cluster'] = cluster.predict(data_train.drop('crime_count', axis = 1))
    data_test['cluster'] = cluster.predict(data_test.drop('crime_count', axis = 1))
@@ -142,35 +142,38 @@ if __name__ == '__main__':
    X_train, y_train, X_test, y_test = data_train.drop('crime_count', axis = 1), data_train['crime_count'], data_test.drop('crime_count', axis = 1), data_test['crime_count']
 
    models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl']
-   # print('LinReg')
-   # createLinearRegression(X_train, y_train, X_test, y_test)
+   print('LinReg')
+   createLinearRegression(X_train, y_train, X_test, y_test)
 
-   # print('CART')
-   # createDecisionTreeRegressor(X_train, y_train, X_test, y_test)
+   print('CART')
+   createDecisionTreeRegressor(X_train, y_train, X_test, y_test)
 
-   # print('RandomForest')
-   # createRandomForest(X_train, y_train, X_test, y_test)
+   print('RandomForest')
+   createRandomForestRegressor(X_train, y_train, X_test, y_test)
    
-   # print('XGB')
-   # createXGBregressor(X_train, y_train, X_test, y_test)
+   print('XGB')
+   createXGBregressor(X_train, y_train, X_test, y_test)
 
    modified_df_train = get_all_models_prediction(models, X_train)
    modified_df_test = get_all_models_prediction(models, X_test)
 
    X_train_modified, X_test_modified = modified_df_train, modified_df_test
 
-   crime_scaler = MinMaxScaler((0,1)).fit(y_train.to_frame())
-   dump(crime_scaler, open('crime_minmax_scaler.pkl', 'wb'))
+   # crime_scaler = MinMaxScaler((0,1)).fit(y_train.to_frame())
+   # dump(crime_scaler, open('pkl_models/crime_minmax_scaler.pkl', 'wb'))
+   crime_scaler = loadModel('crime_minmax_scaler.pkl')
    y_train_scaled = pd.Series(crime_scaler.transform(y_train.to_frame())[:,0], index = y_train.index)
    y_test_scaled = pd.Series(crime_scaler.transform(y_test.to_frame())[:,0], index = y_test.index)
 
    y_train_scaled = y_train_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
    y_test_scaled = y_test_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
 
-   # createLogisticRegression(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled )
-   # print('SVM')
-   # createSVM(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
+   print('Logistic Regression')
+   createLogisticRegression(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled )
+   # print('SVC')
+   # createSVC(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
    print('Tree Classifier')
    createDecisionTreeClassifier(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
+   createRandomForestClassifier(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
 
    
