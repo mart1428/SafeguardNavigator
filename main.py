@@ -6,8 +6,9 @@ from sklearn.cluster import KMeans
 from pickle import dump
 import sys
 
-from model import createLinearRegression, createAndSaveScaler, loadScaler, loadModel, createRandomForestRegressor, createXGBregressor, createLogisticRegression,\
-createDeterministicProcessIndex, createSVC, createDecisionTreeClassifier, createDecisionTreeRegressor, createRandomForestClassifier
+from model import createLinearRegression, createAndSaveScaler, loadScaler, loadModel, createXGBregressor, createLogisticRegression,\
+createDeterministicProcessIndex, createDecisionTreeClassifier, createDecisionTreeRegressor,\
+createKNN, createElasticNet, createRandomForestRegressor, createRandomForestClassifier
 
 def clean_csv_data(filename):
    '''
@@ -110,12 +111,12 @@ def run(data, models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomFores
 
 if __name__ == '__main__':
    #------------------IF Running for the first time-----------------------
-   # clean_csv_data('Major_Crime_Indicators_Open_Data.csv')
-   # df = pd.read_csv('data_clean.csv')
-   # df = df[df.OCC_DATE >= '2022-01-01']
+   clean_csv_data('Major_Crime_Indicators_Open_Data.csv')
+   df = pd.read_csv('data_clean.csv')
+   df = df[df.OCC_DATE >= '2022-01-01']
 
-   # df = prepare_data(df)
-   # df.to_csv('processed_data.csv')
+   df = prepare_data(df)
+   df.to_csv('processed_data.csv')
    #====================================================================
 
    data = pd.read_csv('processed_data.csv', index_col= 'date', parse_dates= True)         #lat long example: 43.6384649321311  -79.4378661170172
@@ -133,6 +134,7 @@ if __name__ == '__main__':
 
    cluster = KMeans().fit(data_train.drop('crime_count', axis = 1))
    dump(cluster, open('pkl_models/cluster.pkl', 'wb'))
+   # cluster = loadModel('pkl_models/cluster.pkl')
    cluster = loadModel('cluster.pkl')
 
    data_train['cluster'] = cluster.predict(data_train.drop('crime_count', axis = 1))
@@ -141,13 +143,24 @@ if __name__ == '__main__':
 
    X_train, y_train, X_test, y_test = data_train.drop('crime_count', axis = 1), data_train['crime_count'], data_test.drop('crime_count', axis = 1), data_test['crime_count']
 
-   models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl']
+   models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl', 'ElasticNet.pkl']
    print('LinReg')
    createLinearRegression(X_train, y_train, X_test, y_test)
 
    print('CART')
    createDecisionTreeRegressor(X_train, y_train, X_test, y_test)
 
+   print('ElasticNet')
+   createElasticNet(X_train, y_train, X_test, y_test)
+
+   print('RandomForest')
+   createRandomForestRegressor(X_train, y_train, X_test, y_test)
+   
+   print('XGB')
+   createXGBregressor(X_train, y_train, X_test, y_test)
+   
+   # print('SVR')
+   # createSVR(X_train, y_train, X_test, y_test)
    print('RandomForest')
    createRandomForestRegressor(X_train, y_train, X_test, y_test)
    
@@ -167,6 +180,12 @@ if __name__ == '__main__':
 
    y_train_scaled = y_train_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
    y_test_scaled = y_test_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
+
+# ##################################################
+   # createKNN(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
+
+   # print('SVM')
+   # createSVM(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
 
    print('Logistic Regression')
    createLogisticRegression(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled )
