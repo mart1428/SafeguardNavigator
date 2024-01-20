@@ -90,7 +90,61 @@ def get_all_models_prediction(models, X):
    
    return modified_df
 
-def run(data, models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl']):
+def train_pipeline(data, train_test_date_split = '2023-06-30', regressor_models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'ElasticNet.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl'], classifier_models = ['RandomForestClassifier.pkl', 'LogisticRegression.pkl']):
+   data = createAndSaveScaler(data)
+   lat_scaler, long_scaler, crime_count_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl', 'pkl_models/crime_count_scaler.pkl')
+   data['LAT_WGS84'] = lat_scaler.transform(data[['LAT_WGS84']])
+   data['LONG_WGS84'] = long_scaler.transform(data[['LONG_WGS84']])
+   data['crime_count'] = crime_count_scaler.transform(data[['crime_count']])
+
+   data_train = data[data.index <= train_test_date_split]              
+   data_test = data[data.index > train_test_date_split]
+
+   cluster = KMeans(n_init = 'auto', n_clusters = 3).fit(data_train.drop('crime_count', axis = 1))
+   dump(cluster, open('pkl_models/cluster.pkl', 'wb'))
+   data_train['cluster'] = cluster.predict(data_train.drop('crime_count', axis = 1))
+   data_test['cluster'] = cluster.predict(data_test.drop('crime_count', axis = 1))
+
+   X_train, y_train, X_test, y_test = data_train.drop('crime_count', axis = 1), data_train['crime_count'], data_test.drop('crime_count', axis = 1), data_test['crime_count']
+
+   print('LinReg')
+   createLinearRegression(X_train, y_train, X_test, y_test)
+
+   print('CART')
+   createDecisionTreeRegressor(X_train, y_train, X_test, y_test)
+
+   print('ElasticNet')
+   createElasticNet(X_train, y_train, X_test, y_test)
+
+   print('RandomForest')
+   createRandomForestRegressor(X_train, y_train, X_test, y_test)
+   
+   print('XGB')
+   createXGBregressor(X_train, y_train, X_test, y_test)
+   
+   modified_df_train = get_all_models_prediction(regressor_models, X_train)
+   modified_df_test = get_all_models_prediction(regressor_models, X_test)
+
+   X_train_modified, X_test_modified = modified_df_train, modified_df_test
+
+   crime_scaler = MinMaxScaler((0,1)).fit(y_train.to_frame())
+   dump(crime_scaler, open('pkl_models/crime_minmax_scaler.pkl', 'wb'))
+   y_train_scaled = pd.Series(crime_scaler.transform(y_train.to_frame())[:,0], index = y_train.index)
+   y_test_scaled = pd.Series(crime_scaler.transform(y_test.to_frame())[:,0], index = y_test.index)
+
+   y_train_scaled = y_train_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
+   y_test_scaled = y_test_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
+
+   print('Logistic Regression')
+   createLogisticRegression(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled )
+   print('Tree Classifier')
+   createDecisionTreeClassifier(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
+   print('RF Classifier')
+   createRandomForestClassifier(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
+
+
+
+def run_pipeline(data, regressor_models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'ElasticNet.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl'], classifier_models = ['RandomForestClassifier.pkl', 'LogisticRegression.pkl']):
    lat_scaler, long_scaler, crime_count_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl', 'pkl_models/crime_count_scaler.pkl')
    data['LAT_WGS84'] = lat_scaler.transform(data[['LAT_WGS84']])
    data['LONG_WGS84'] = long_scaler.transform(data[['LONG_WGS84']])
@@ -100,34 +154,36 @@ def run(data, models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'RandomFores
    data['cluster'] = cluster.predict(data.drop('crime_count', axis = 1))
 
    X, y = data.drop('crime_count', axis = 1), data['crime_count']
-   modified_X = get_all_models_prediction(models, X)
+   modified_X = get_all_models_prediction(regressor_models, X)
    
    crime_scaler = loadModel('crime_minmax_scaler.pkl')
    y_scaled = pd.Series(crime_scaler.transform(y.to_frame())[:,0], index = y.index)
 
    y_scaled = y_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
-   modified_data = get_all_models_prediction(['SVR.pkl'], modified_X)
-   return modified_data['SVR.pkl']
+   modified_data = get_all_models_prediction(classifier_models, modified_X)
+   return modified_data[classifier_models], y_scaled
 
 if __name__ == '__main__':
    #------------------IF Running for the first time-----------------------
-   clean_csv_data('Major_Crime_Indicators_Open_Data.csv')
-   df = pd.read_csv('data_clean.csv')
-   df = df[df.OCC_DATE >= '2022-01-01']
+   # clean_csv_data('Major_Crime_Indicators_Open_Data.csv')
+   # df = pd.read_csv('data_clean.csv')
+   # df = df[df.OCC_DATE >= '2022-01-01']
 
-   df = prepare_data(df)
-   df.to_csv('processed_data.csv')
+   # df = prepare_data(df)
+   # df.to_csv('processed_data.csv')
    #====================================================================
 
    data = pd.read_csv('processed_data.csv', index_col= 'date', parse_dates= True)         #lat long example: 43.6384649321311  -79.4378661170172
    data = data.to_period('H')
-
+   train_pipeline(data)
+   print(run_pipeline(data))
+   sys.exit(0)
    # data = data[(data.LAT_WGS84 == 43.6384649321311) & (data.LONG_WGS84 == -79.4378661170172)]
-   data = createAndSaveScaler(data)
-   lat_scaler, long_scaler, crime_count_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl', 'pkl_models/crime_count_scaler.pkl')
-   data['LAT_WGS84'] = lat_scaler.transform(data[['LAT_WGS84']])
-   data['LONG_WGS84'] = long_scaler.transform(data[['LONG_WGS84']])
-   data['crime_count'] = crime_count_scaler.transform(data[['crime_count']])
+   # data = createAndSaveScaler(data)
+   # lat_scaler, long_scaler, crime_count_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl', 'pkl_models/crime_count_scaler.pkl')
+   # data['LAT_WGS84'] = lat_scaler.transform(data[['LAT_WGS84']])
+   # data['LONG_WGS84'] = long_scaler.transform(data[['LONG_WGS84']])
+   # data['crime_count'] = crime_count_scaler.transform(data[['crime_count']])
 
    data_train = data[data.index <= '2023-06-30']              
    data_test = data[data.index > '2023-06-30']

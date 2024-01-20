@@ -4,7 +4,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, accuracy_score, recall_score, precision_score
 from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.svm import SVC
+from sklearn.svm import SVC, SVR
 
 
 from sklearn.model_selection import GridSearchCV
@@ -153,7 +153,7 @@ def createDecisionTreeClassifier(X_train, y_train, X_test, y_test):
     dump(model, open('pkl_models/DecisionTreeClassifier.pkl', 'wb'))
 
 def createRandomForestClassifier(X_train, y_train, X_test, y_test):
-    model = DecisionTreeClassifier(class_weight= 'balanced',random_state= 0).fit(X_train, y_train)
+    model = RandomForestClassifier(class_weight= 'balanced',random_state= 0).fit(X_train, y_train)
 
     y_fit = pd.Series(model.predict(X_train), index = X_train.index)
     y_pred = pd.Series(model.predict(X_test), index = X_test.index)
