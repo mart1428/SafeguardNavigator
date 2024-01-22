@@ -132,8 +132,8 @@ def createXGBregressor(X_train, y_train, X_test, y_test, show_performance = True
     Print out train and test MSE and save model as a .pkl file. 
     '''
 
-    model = XGBRegressor(random_state= 0).fit(X_train, y_train)
-    gs = GridSearchCV(model, {'grow_policy' : [0,1], 'learning_rate' : [0.001, 0.01], 'reg_alpha' : [0,0.1,0.01], 'reg_lambda' : [0,0.1,0.01]} )
+    model = XGBRegressor(random_state= 0)
+    gs = GridSearchCV(model, {'learning_rate' : [0.001, 0.01], 'reg_alpha' : [0,0.1,0.01], 'reg_lambda' : [0,0.1,0.01]} )
     gs.fit(X_train, y_train)
     best_model = gs.best_estimator_
     y_fit = pd.Series(best_model.predict(X_train), index = X_train.index)
@@ -149,71 +149,105 @@ def createXGBregressor(X_train, y_train, X_test, y_test, show_performance = True
 
     dump(best_model, open('pkl_models/XGBRegressor.pkl', 'wb'))
 
-def createLogisticRegression(X_train, y_train, X_test, y_test):
-    model = LogisticRegression(class_weight= 'balanced', random_state= 0).fit(X_train, y_train)
-
-    y_fit = pd.Series(model.predict(X_train), index = X_train.index)
-    y_pred = pd.Series(model.predict(X_test), index = X_test.index)
-
-    train_acc = accuracy_score(y_train, y_fit)
-    test_acc = accuracy_score(y_test, y_pred)
-    test_recall = recall_score(y_test, y_pred)
-    test_precision = precision_score(y_test, y_pred)
-
-    y_pred_proba = pd.Series(model.predict_proba(X_test)[:,1], index = X_test.index)
-
-    print("Train score:", train_acc)
-    print("Test score:", test_acc)
-    print("Recall Test score:", test_recall)
-    print("Precision Test score:", test_precision)
-    print(y_pred_proba)
-
-    dump(model, open('pkl_models/LogisticRegression.pkl', 'wb'))
-
-def createDecisionTreeClassifier(X_train, y_train, X_test, y_test):
-    model = DecisionTreeClassifier(class_weight= 'balanced',random_state= 0).fit(X_train, y_train)
-
-    y_fit = pd.Series(model.predict(X_train), index = X_train.index)
-    y_pred = pd.Series(model.predict(X_test), index = X_test.index)
+def createLogisticRegression(X_train, y_train, X_test, y_test, show_performance = True):
+    '''
+    (pandas.DataFrame), (pandas.Series), (pandas.DataFrame), (pandas.Series), (Bool) -> (None)
+    Fit a Logistic Regression model. GridSearchCV is also applied to get better performance while also avoiding overfitting.
+    Print out train and test MSE and save model as a .pkl file. 
+    '''
+    model = LogisticRegression(class_weight= 'balanced', random_state= 0)
+    gs = GridSearchCV(model, {'penalty' : ['l1', 'l2', 'elasticnet']})
+    gs.fit(X_train, y_train)
+    best_model = gs.best_estimator_
+    
+    y_fit = pd.Series(best_model.predict(X_train), index = X_train.index)
+    y_pred = pd.Series(best_model.predict(X_test), index = X_test.index)
 
     train_acc = accuracy_score(y_train, y_fit)
     test_acc = accuracy_score(y_test, y_pred)
     test_recall = recall_score(y_test, y_pred)
     test_precision = precision_score(y_test, y_pred)
 
-    y_pred_proba = pd.Series(model.predict_proba(X_test)[:,1], index = X_test.index)
+    y_pred_proba = pd.Series(best_model.predict_proba(X_test)[:,1], index = X_test.index)
 
-    print("Train score:", train_acc)
-    print("Test score:", test_acc)
-    print("Recall Test score:", test_recall)
-    print("Precision Test score:", test_precision)
-    print(y_pred_proba)
+    if show_performance:
+        print("Train score:", train_acc)
+        print("Test score:", test_acc)
+        print("Recall Test score:", test_recall)
+        print("Precision Test score:", test_precision)
+        print("Y_pred_proba:", y_pred_proba)
 
-    # dump(model, open('pkl_models/SVM.pkl', 'wb'))
-    dump(model, open('pkl_models/DecisionTreeClassifier.pkl', 'wb'))
+    dump(best_model, open('pkl_models/LogisticRegression.pkl', 'wb'))
 
-def createRandomForestClassifier(X_train, y_train, X_test, y_test):
-    model = RandomForestClassifier(class_weight= 'balanced',random_state= 0).fit(X_train, y_train)
+def createDecisionTreeClassifier(X_train, y_train, X_test, y_test, show_performance = True):
+    '''
+    (pandas.DataFrame), (pandas.Series), (pandas.DataFrame), (pandas.Series), (Bool) -> (None)
+    Fit a Decision Tree Classifier model. GridSearchCV is also applied to get better performance while also avoiding overfitting.
+    Print out train and test MSE and save model as a .pkl file. 
+    '''
+    model = DecisionTreeClassifier(class_weight= 'balanced',random_state= 0)
+    gs = GridSearchCV(model,{'criterion' : ['gini', 'entropy'], 'max_features' : ['sqrt', 'log2']})
+    gs.fit(X_train, y_train)
+    best_model = gs.best_estimator_
 
-    y_fit = pd.Series(model.predict(X_train), index = X_train.index)
-    y_pred = pd.Series(model.predict(X_test), index = X_test.index)
+    y_fit = pd.Series(best_model.predict(X_train), index = X_train.index)
+    y_pred = pd.Series(best_model.predict(X_test), index = X_test.index)
 
     train_acc = accuracy_score(y_train, y_fit)
     test_acc = accuracy_score(y_test, y_pred)
     test_recall = recall_score(y_test, y_pred)
     test_precision = precision_score(y_test, y_pred)
 
-    y_pred_proba = pd.Series(model.predict_proba(X_test)[:,1], index = X_test.index)
+    y_pred_proba = pd.Series(best_model.predict_proba(X_test)[:,1], index = X_test.index)
 
-    print("Train score:", train_acc)
-    print("Test score:", test_acc)
-    print("Recall Test score:", test_recall)
-    print("Precision Test score:", test_precision)
-    print(y_pred_proba)
+    if show_performance:
+        print("Train score:", train_acc)
+        print("Test score:", test_acc)
+        print("Recall Test score:", test_recall)
+        print("Precision Test score:", test_precision)
+        print("Y_pred_proba:", y_pred_proba)
 
-    dump(model, open('pkl_models/RandomForestClassifier.pkl', 'wb'))
+    dump(best_model, open('pkl_models/DecisionTreeClassifier.pkl', 'wb'))
 
-def createSVC(X_train, y_train, X_test, y_test):
+def createRandomForestClassifier(X_train, y_train, X_test, y_test, show_performance = True):
+    '''
+    (pandas.DataFrame), (pandas.Series), (pandas.DataFrame), (pandas.Series), (Bool) -> (None)
+    Fit a Random Forest Classifier model. GridSearchCV is also applied to get better performance while also avoiding overfitting.
+    Print out train and test MSE and save model as a .pkl file. 
+    '''
+    model = RandomForestClassifier(class_weight= 'balanced',random_state= 0)
+    gs = GridSearchCV(model, {'criterion' : ['gini', 'entropy'], 'n_estimators' : [25, 50], 'max_features' : ['sqrt', 'log2']})
+    gs.fit(X_train, y_train)
+    best_model = gs.best_estimator_
+
+    y_fit = pd.Series(best_model.predict(X_train), index = X_train.index)
+    y_pred = pd.Series(best_model.predict(X_test), index = X_test.index)
+
+    train_acc = accuracy_score(y_train, y_fit)
+    test_acc = accuracy_score(y_test, y_pred)
+    test_recall = recall_score(y_test, y_pred)
+    test_precision = precision_score(y_test, y_pred)
+
+    y_pred_proba = pd.Series(best_model.predict_proba(X_test)[:,1], index = X_test.index)
+
+    if show_performance:
+        print("Train score:", train_acc)
+        print("Test score:", test_acc)
+        print("Recall Test score:", test_recall)
+        print("Precision Test score:", test_precision)
+        print(y_pred_proba)
+
+    dump(best_model, open('pkl_models/RandomForestClassifier.pkl', 'wb'))
+
+def createSVC(X_train, y_train, X_test, y_test, show_performance = True):
+    '''
+    (pandas.DataFrame), (pandas.Series), (pandas.DataFrame), (pandas.Series), (Bool) -> (None)
+
+    Note: Slow training performance
+
+    Fit a Support Vector Classifier model.
+    Print out train and test MSE and save model as a .pkl file. 
+    '''
     model = SVC(kernel = 'rbf', class_weight = 'balanced',random_state= 0).fit(X_train, y_train)
 
     y_fit = pd.Series(model.predict(X_train), index = X_train.index)
@@ -226,11 +260,12 @@ def createSVC(X_train, y_train, X_test, y_test):
 
     y_pred_proba = pd.Series(model.predict_proba(X_test)[:,1], index = X_test.index)
 
-    print("Train score:", train_acc)
-    print("Test score:", test_acc)
-    print("Recall Test score:", test_recall)
-    print("Precision Test score:", test_precision)
-    print(y_pred_proba)
+    if show_performance:
+        print("Train score:", train_acc)
+        print("Test score:", test_acc)
+        print("Recall Test score:", test_recall)
+        print("Precision Test score:", test_precision)
+        print(y_pred_proba)
 
     dump(model, open('pkl_models/SVC.pkl', 'wb'))
 
