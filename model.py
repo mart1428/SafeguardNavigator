@@ -21,7 +21,7 @@ from pickle import dump
 def createDeterministicProcessIndex(data, fourier_freq = 'H', fourier_order = 2):
 
     '''
-    Taking too much memory. Unsuitable
+    Taking too much memory. Inapplicable
     '''
     fourier = CalendarFourier(fourier_freq, fourier_order)
 
@@ -37,9 +37,12 @@ def createDeterministicProcessIndex(data, fourier_freq = 'H', fourier_order = 2)
     modified_data = data.join(X, how = 'left')
     return modified_data
 
-def createLinearRegression(X_train, y_train, X_test, y_test):
-    # model = LinearRegression(random_state= 0).fit(X_train, y_train)
-    model = LinearRegression().fit(X_train, y_train)
+def createLinearRegression(X_train, y_train, X_test, y_test, show_performance = True):
+    '''
+    (pandas.DataFrame), (pandas.Series), (pandas.DataFrame), (pandas.Series), (Bool) -> (None)
+    Fit a Linear Regression model. Print out train and test MSE and save model as a .pkl file. 
+    '''
+    model = LinearRegression(random_state= 0).fit(X_train, y_train)
 
     y_fit = pd.Series(model.predict(X_train), index = X_train.index)
     y_pred = pd.Series(model.predict(X_test), index = X_test.index)
@@ -47,45 +50,72 @@ def createLinearRegression(X_train, y_train, X_test, y_test):
     train_mse = mean_squared_error(y_train, y_fit)
     test_mse = mean_squared_error(y_test, y_pred)
 
-    print("Train score:", train_mse)
-    print("Test score:", test_mse)
+    if show_performance:
+        print("Train score:", train_mse)
+        print("Test score:", test_mse)
 
     dump(model, open('pkl_models/LinearRegression.pkl', 'wb'))
 
 
-def createDecisionTreeRegressor(X_train, y_train, X_test, y_test):
-    model = DecisionTreeRegressor(random_state= 0).fit(X_train, y_train)
+def createDecisionTreeRegressor(X_train, y_train, X_test, y_test, show_performance = True):
+    '''
+    (pandas.DataFrame), (pandas.Series), (pandas.DataFrame), (pandas.Series), (Bool) -> (None)
+    Fit a Decision Tree model. GridSearchCV is also applied to get better performance while also avoiding overfitting.
+    Print out train and test MSE and save model as a .pkl file. 
+    '''
+    model = DecisionTreeRegressor(random_state= 0)
+    gs = GridSearchCV(model, param_grid= {'max_features': ['sqrt', 'log2', None]})
+    gs.fit(X_train, y_train)
+    best_model = gs.best_estimator_
 
-    y_fit = pd.Series(model.predict(X_train), index = X_train.index)
-    y_pred = pd.Series(model.predict(X_test), index = X_test.index)
-
-    train_mse = mean_squared_error(y_train, y_fit)
-    test_mse = mean_squared_error(y_test, y_pred)
-
-    print("Train score:", train_mse)
-    print("Test score:", test_mse)
-
-    dump(model, open('pkl_models/DecisionTreeRegressor.pkl', 'wb'))
-
-def createRandomForestRegressor(X_train, y_train, X_test, y_test):
-    model = RandomForestRegressor(random_state= 0).fit(X_train, y_train)
-
-    y_fit = pd.Series(model.predict(X_train), index = X_train.index)
-    y_pred = pd.Series(model.predict(X_test), index = X_test.index)
+    y_fit = pd.Series(best_model.predict(X_train), index = X_train.index)
+    y_pred = pd.Series(best_model.predict(X_test), index = X_test.index)
 
     train_mse = mean_squared_error(y_train, y_fit)
     test_mse = mean_squared_error(y_test, y_pred)
 
-    print("Train score:", train_mse)
-    print("Test score:", test_mse)
+    if show_performance:
+        print("Train score:", train_mse)
+        print("Test score:", test_mse)
 
-    dump(model, open('pkl_models/RandomForestRegression.pkl', 'wb'))
+
+    dump(best_model, open('pkl_models/DecisionTreeRegressor.pkl', 'wb'))
+
+def createRandomForestRegressor(X_train, y_train, X_test, y_test, show_performance = True):
+    '''
+    (pandas.DataFrame), (pandas.Series), (pandas.DataFrame), (pandas.Series), (Bool) -> (None) 
+    Fit a Random Forest model. GridSearchCV is also applied to get better performance while also avoiding overfitting.
+    Print out train and test MSE and save model as a .pkl file. 
+    '''
+    model = RandomForestRegressor(random_state= 0)
+    gs = GridSearchCV(model, param_grid={'n_estimators' : [25, 50], 'min_impurity_decrease' : [0,0.01,0.1], 'max_features' : ['sqrt', 'log2']})
+    gs.fit(X_train, y_train)
+    best_model = gs.best_estimator_
+    y_fit = pd.Series(best_model.predict(X_train), index = X_train.index)
+    y_pred = pd.Series(best_model.predict(X_test), index = X_test.index)
+
+    train_mse = mean_squared_error(y_train, y_fit)
+    test_mse = mean_squared_error(y_test, y_pred)
+
+    if show_performance:
+        print("Train score:", train_mse)
+        print("Test score:", test_mse)
+
+
+    dump(best_model, open('pkl_models/RandomForestRegression.pkl', 'wb'))
 
 def createElasticNet(X_train, y_train, X_test, y_test):
-    model = ElasticNet(alpha=1, l1_ratio=0.5, random_state=0).fit(X_train, y_train)
-
-    y_fit = pd.Series(model.predict(X_train), index = X_train.index)
-    y_pred = pd.Series(model.predict(X_test), index = X_test.index)
+    '''
+    (pandas.DataFrame), (pandas.Series), (pandas.DataFrame), (pandas.Series), (Bool) -> (None)
+    Fit a ElasticNet model. GridSearchCV is also applied to get better performance while also avoiding overfitting.
+    Print out train and test MSE and save model as a .pkl file. 
+    '''
+    model = ElasticNet(random_state=0)
+    gs = GridSearchCV(model, {'alpha' : (0.1,0.5,0.8,1), 'l1_ratio' : (0.1, 0.2, 0.5, 0.8, 1)})
+    gs.fit(X_train, y_train)
+    best_model = gs.best_estimator_
+    y_fit = pd.Series(best_model.predict(X_train), index = X_train.index)
+    y_pred = pd.Series(best_model.predict(X_test), index = X_test.index)
 
     train_mse = mean_squared_error(y_train, y_fit)
     test_mse = mean_squared_error(y_test, y_pred)
@@ -93,21 +123,31 @@ def createElasticNet(X_train, y_train, X_test, y_test):
     print("Train score:", train_mse)
     print("Test score:", test_mse)
 
-    dump(model, open('pkl_models/ElasticNet.pkl', 'wb'))
+    dump(best_model, open('pkl_models/ElasticNet.pkl', 'wb'))
 
-def createXGBregressor(X_train, y_train, X_test, y_test):
+def createXGBregressor(X_train, y_train, X_test, y_test, show_performance = True):
+    '''
+    (pandas.DataFrame), (pandas.Series), (pandas.DataFrame), (pandas.Series), (Bool) -> (None)
+    Fit a XGBRegressor model. GridSearchCV is also applied to get better performance while also avoiding overfitting.
+    Print out train and test MSE and save model as a .pkl file. 
+    '''
+
     model = XGBRegressor(random_state= 0).fit(X_train, y_train)
-
-    y_fit = pd.Series(model.predict(X_train), index = X_train.index)
-    y_pred = pd.Series(model.predict(X_test), index = X_test.index)
+    gs = GridSearchCV(model, {'grow_policy' : [0,1], 'learning_rate' : [0.001, 0.01], 'reg_alpha' : [0,0.1,0.01], 'reg_lambda' : [0,0.1,0.01]} )
+    gs.fit(X_train, y_train)
+    best_model = gs.best_estimator_
+    y_fit = pd.Series(best_model.predict(X_train), index = X_train.index)
+    y_pred = pd.Series(best_model.predict(X_test), index = X_test.index)
 
     train_mse = mean_squared_error(y_train, y_fit)
     test_mse = mean_squared_error(y_test, y_pred)
 
-    print("Train score:", train_mse)
-    print("Test score:", test_mse)
+    if show_performance:
+        print("Train score:", train_mse)
+        print("Test score:", test_mse)
 
-    dump(model, open('pkl_models/XGBRegressor.pkl', 'wb'))
+
+    dump(best_model, open('pkl_models/XGBRegressor.pkl', 'wb'))
 
 def createLogisticRegression(X_train, y_train, X_test, y_test):
     model = LogisticRegression(class_weight= 'balanced', random_state= 0).fit(X_train, y_train)
