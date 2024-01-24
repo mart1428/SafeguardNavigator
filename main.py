@@ -4,6 +4,8 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.cluster import KMeans
 
 from pickle import dump
+
+from datetime import datetime
 import sys
 
 from model import createLinearRegression, createAndSaveScaler, loadScaler, loadModel, createXGBregressor, createLogisticRegression,\
@@ -61,6 +63,9 @@ def prepare_data(df):
       if c == 500:        #To reduce number of data received 
          break
       c+= 1
+   # data_prepared.reset_index(inplace=True)
+   # data_prepared['hour'] = data_prepared['date'].dt.hour
+   # print(data_prepared['hour'])
    return data_prepared
 
    
@@ -74,7 +79,7 @@ def get_lat_long_combo(df):
       lat_long_set.add((row[1], row[2]))
    return lat_long_set
 
-def get_all_models_prediction(models, X):
+def get_all_models_prediction(models, X, prob=False):
    '''
    (List(str)), (pandas.DataFrame) -> (pandas.DataFrame)
    Using the provided list of model file names, load the model and predict using the provided X values. 
@@ -86,13 +91,16 @@ def get_all_models_prediction(models, X):
    for m in models:
       model = loadModel(m)
 
-      y_pred = pd.Series(model.predict(X), index = X.index)
+      if prob:
+         y_pred = pd.Series(model.predict_proba(X)[:, 1], index=X.index)
+      else:
+         y_pred = pd.Series(model.predict(X), index = X.index)
 
       modified_df[m] = y_pred
    
    return modified_df
 
-def train_pipeline(data, train_test_date_split = '2023-06-30', regressor_models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'ElasticNet.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl'], classifier_models = ['RandomForestClassifier.pkl', 'LogisticRegression.pkl']):
+def train_pipeline(data, train_test_date_split = '2023-06-30', regressor_models = ['LinearRegression.pkl', 'DecisionTreeRegressor.pkl', 'ElasticNet.pkl', 'RandomForestRegression.pkl', 'XGBRegressor.pkl'], classifier_models = ['RandomForestClassifier.pkl', 'LogisticRegression.pkl', 'DecisionTreeClassifier.pkl']):
    '''
    (pandas.DataFrame), (String), list(String), list(String) -> (None)
 
@@ -145,14 +153,13 @@ def train_pipeline(data, train_test_date_split = '2023-06-30', regressor_models 
    y_test_scaled = y_test_scaled.apply(lambda x: 1 if x > 0 else 0)
 
    print('\nLogistic Regression')
-   createLogisticRegression(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled )
+   createLogisticRegression(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
    print('\nTree Classifier')
    createDecisionTreeClassifier(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
    print('\nRF Classifier')
    createRandomForestClassifier(X_train_modified, y_train_scaled, X_test_modified, y_test_scaled)
 
-
-def run_pipeline(data, regressor_models = ['LinearRegression.pkl', 'DecisionTree.pkl', 'ElasticNet.pkl', 'RandomForest.pkl', 'XGBRegressor.pkl'], classifier_models = ['RandomForestClassifier.pkl', 'LogisticRegression.pkl']):
+def run_pipeline(data, regressor_models = ['LinearRegression.pkl', 'DecisionTreeRegressor.pkl', 'ElasticNet.pkl', 'RandomForestRegression.pkl', 'XGBRegressor.pkl'], classifier_models = ['RandomForestClassifier.pkl', 'LogisticRegression.pkl', 'DecisionTreeClassifier.pkl']):
    lat_scaler, long_scaler, crime_count_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl', 'pkl_models/crime_count_scaler.pkl')
    data['LAT_WGS84'] = lat_scaler.transform(data[['LAT_WGS84']])
    data['LONG_WGS84'] = long_scaler.transform(data[['LONG_WGS84']])
@@ -163,25 +170,71 @@ def run_pipeline(data, regressor_models = ['LinearRegression.pkl', 'DecisionTree
 
    X, y = data.drop('crime_count', axis = 1), data['crime_count']
    modified_X = get_all_models_prediction(regressor_models, X)
-   
+
    crime_scaler = loadModel('crime_minmax_scaler.pkl')
    y_scaled = pd.Series(crime_scaler.transform(y.to_frame())[:,0], index = y.index)
 
    y_scaled = y_scaled.apply(lambda x: 1 if x >= 0.01 else 0)
+
    modified_data = get_all_models_prediction(classifier_models, modified_X)
+   
    return modified_data[classifier_models], y_scaled
+
+def predict_crime(input, regressor_models, classifier_models):
+
+   def preprocess_input(input):   
+      lat_scaler, long_scaler, crime_count_scaler = loadScaler('pkl_models/lat_scaler.pkl', 'pkl_models/long_scaler.pkl', 'pkl_models/crime_count_scaler.pkl')
+      
+      input['LAT_WGS84'] = lat_scaler.transform(input[['LAT_WGS84']])
+      input['LONG_WGS84'] = long_scaler.transform(input[['LONG_WGS84']])
+
+      return input
+   
+   X = preprocess_input(input)
+   X = X.drop('date', axis=1)
+
+   cluster = loadModel('cluster.pkl')
+   X['cluster'] = cluster.predict(X)
+   
+   modified_X = get_all_models_prediction(regressor_models, X)
+
+   modified_data = get_all_models_prediction(classifier_models, modified_X, prob=True)
+
+   probability = modified_data[classifier_models].mean(axis=1)
+
+   return probability
 
 if __name__ == '__main__':
    #------------------IF Running for the first time-----------------------
-   # clean_csv_data('Major_Crime_Indicators_Open_Data.csv')
-   # df = pd.read_csv('data_clean.csv')
-   # df = df[df.OCC_DATE >= '2022-01-01']
+   clean_csv_data('Major_Crime_Indicators_Open_Data.csv')
+   df = pd.read_csv('data_clean.csv')
+   df = df[df.OCC_DATE >= '2022-01-01']
 
-   # df = prepare_data(df)
-   # df.to_csv('processed_data.csv')
+   df = prepare_data(df)
+   df.to_csv('processed_data.csv')
    #====================================================================
+
+   regressor_models = ['LinearRegression.pkl', 'DecisionTreeRegressor.pkl', 'ElasticNet.pkl', 'RandomForestRegression.pkl', 'XGBRegressor.pkl']
+   classifier_models = ['RandomForestClassifier.pkl', 'LogisticRegression.pkl', 'DecisionTreeClassifier.pkl']
 
    data = pd.read_csv('processed_data.csv', index_col= 'date', parse_dates= True)         #lat long example: 43.6384649321311  -79.4378661170172
    data = data.to_period('H')
-   train_pipeline(data)
-   print(run_pipeline(data))
+   
+   # train_pipeline(data)
+
+   # print(run_pipeline(data))
+
+   #Output based on given input
+   time_range = pd.date_range(start='2023-01-01 00:00:00', end='2023-01-01 23:00:00', freq='H')
+
+   input_data = pd.DataFrame({
+      'date': time_range.strftime('%Y-%m-%d %H:%M'),
+      'LAT_WGS84': [43.6419425824341] * len(time_range),
+      'LONG_WGS84': [-79.5489557502586] * len(time_range)
+   })
+   # input_data['date'] = pd.to_datetime(input_data['date'])
+   # input_data['hour'] = input_data['date'].dt.hour
+   # print(input_data)
+
+   print(predict_crime(input_data, regressor_models, classifier_models))
+    
